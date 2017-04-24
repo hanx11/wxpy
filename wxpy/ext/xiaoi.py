@@ -117,7 +117,7 @@ class XiaoI(object):
         """
 
         error_patterns = (
-            re.compile(r'^主人还没给我设置这类话题的回复\w$'),
+            re.compile(r'^主人还没给我设置这类话题的回复*'),
         )
 
         if isinstance(msg, Message):
@@ -135,15 +135,17 @@ class XiaoI(object):
         }
 
         resp = self.session.post(self.url, data=params)
-        text = resp.text
-
-        for pattern in error_patterns:
-            if re.match(pattern, text):
+        if resp.ok:
+            text = resp.text
+            
+            for pattern in error_patterns:
+                if re.match(pattern, text):
                 raise ValueError('No sense reply {}'.format(text))
-
-        if at_member:
-            if len(msg.chat) > 2 and msg.member.name and not self.is_last_member(msg):
-                return "@{0} {1}".format(msg.member.name, text)
-
-        return text
+            
+            if at_member:
+                if len(msg.chat) > 2 and msg.member.name and not self.is_last_member(msg):
+                    return "@{0} {1}".format(msg.member.name, text)
+            return text
+        else:
+            raise ValueError('Error Reply!!!')
 
