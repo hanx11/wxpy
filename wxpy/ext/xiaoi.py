@@ -5,6 +5,7 @@
 import collections
 import hashlib
 import logging
+import re
 
 import requests
 
@@ -88,8 +89,14 @@ class XiaoI(object):
         }
 
         return ret
-
-    def do_reply(self, msg):
+    
+    def is_last_member(self, msg):
+        if msg.member == self.last_member.get(msg.chat):
+            return True
+        else:
+            self.last_member[msg.chat] = msg.member
+    
+    def do_reply(self, msg, at_member=True):
         """
         回复消息，并返回答复文本
 
@@ -97,11 +104,11 @@ class XiaoI(object):
         :return: 答复文本
         """
 
-        ret = self.reply_text(msg)
+        ret = self.reply_text(msg, at_member)
         msg.reply(ret)
         return ret
 
-    def reply_text(self, msg):
+    def reply_text(self, msg, at_member=True):
         """
         仅返回答复文本
 
@@ -109,8 +116,8 @@ class XiaoI(object):
         :return: 答复文本
         """
 
-        error_response = (
-            "主人还没给我设置这类话题的回复",
+        error_patterns = (
+            re.compile(r'^主人还没给我设置这类话题的回复\w$'),
         )
 
         if isinstance(msg, Message):
@@ -130,8 +137,13 @@ class XiaoI(object):
         resp = self.session.post(self.url, data=params)
         text = resp.text
 
-        for err in error_response:
-            if err in text:
-                return next_topic()
+        for pattern in error_patterns:
+            if re.match(pattern, text):
+                raise ValueError('No sense reply {}'.format(text))
+
+        if at_member:
+            if len(msg.chat) > 2 and msg.member.name and not self.is_last_member(msg):
+                return "@{0} {1}".format(msg.member.name, text)
 
         return text
+
